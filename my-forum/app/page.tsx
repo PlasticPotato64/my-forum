@@ -2,15 +2,11 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useAuth } from '@/lib/auth'
+import Avatar from '@/components/Avatar'
 
 type Post = {
-  id: string
-  title: string
-  body: string
-  author: string
-  category: string
-  createdAt: string
-  replies: any[]
+  id: string; title: string; body: string; author: string; authorAvatar: string
+  category: string; createdAt: string; replies: any[]
 }
 
 function categoryColor(cat: string): string {
@@ -90,18 +86,16 @@ export default function Home() {
                       <div style={{ fontSize: '12px', color: 'var(--text3)' }}>{timeAgo(post.createdAt)}</div>
                     </div>
                   </div>
-                  <div style={{ marginTop: '12px', fontSize: '12px', color: 'var(--text3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>by <span style={{ color: 'var(--text2)' }}>{post.author}</span></span>
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Avatar username={post.author} avatar={post.authorAvatar} size={20} />
+                    <span style={{ fontSize: '12px', color: 'var(--text3)' }}>
+                      <span style={{ color: 'var(--text2)' }}>{post.author}</span>
+                    </span>
                   </div>
                 </div>
               </Link>
               {user?.username === 'admin' && (
-                <button onClick={() => deletePost(post.id)} style={{
-                  position: 'absolute', top: '12px', right: '12px',
-                  background: 'var(--red)', color: 'white', border: 'none',
-                  borderRadius: '4px', padding: '3px 8px', fontSize: '11px',
-                  cursor: 'pointer', fontFamily: 'var(--font-mono)', zIndex: 10,
-                }}>
+                <button onClick={() => deletePost(post.id)} style={{ position: 'absolute', top: '12px', right: '12px', background: 'var(--red)', color: 'white', border: 'none', borderRadius: '4px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)', zIndex: 10 }}>
                   delete
                 </button>
               )}

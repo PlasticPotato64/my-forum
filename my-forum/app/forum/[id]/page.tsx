@@ -1,12 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
-import { useRouter } from 'next/navigation'
+import Avatar from '@/components/Avatar'
 
-type Reply = { id: string; body: string; author: string; createdAt: string }
-type Post = { id: string; title: string; body: string; author: string; category: string; createdAt: string; replies: Reply[] }
+type Reply = { id: string; body: string; author: string; authorAvatar: string; createdAt: string }
+type Post = { id: string; title: string; body: string; author: string; authorAvatar: string; category: string; createdAt: string; replies: Reply[] }
 
 function categoryColor(cat: string): string {
   const colors = ['#7c6af7','#4ade80','#fbbf24','#f472b6','#60a5fa','#f87171','#34d399','#a78bfa','#fb923c','#38bdf8']
@@ -68,11 +68,7 @@ export default function ThreadPage() {
     loadPost()
   }
 
-  if (!post) return (
-    <div style={{ paddingTop: '80px', textAlign: 'center' }}>
-      <p style={{ color: 'var(--text2)', marginBottom: '16px' }}>Loading...</p>
-    </div>
-  )
+  if (!post) return <div style={{ paddingTop: '80px', textAlign: 'center', color: 'var(--text3)' }}>loading...</div>
 
   const inputStyle = { width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text)', fontSize: '14px', transition: 'border-color 0.15s' }
 
@@ -96,8 +92,10 @@ export default function ThreadPage() {
         </div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(20px, 4vw, 28px)', fontWeight: 700, letterSpacing: '-0.3px', lineHeight: 1.2, marginBottom: '16px' }}>{post.title}</h1>
         <p style={{ color: 'var(--text)', lineHeight: 1.8, fontSize: '14px', marginBottom: '20px', whiteSpace: 'pre-wrap' }}>{post.body}</p>
-        <div style={{ fontSize: '12px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
-          posted by <span style={{ color: 'var(--accent2)' }}>{post.author}</span> · {timeAgo(post.createdAt)}
+        <div style={{ fontSize: '12px', color: 'var(--text3)', borderTop: '1px solid var(--border)', paddingTop: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Avatar username={post.author} avatar={post.authorAvatar} size={22} />
+          <span style={{ color: 'var(--accent2)' }}>{post.author}</span>
+          <span>· {timeAgo(post.createdAt)}</span>
         </div>
       </div>
 
@@ -119,8 +117,10 @@ export default function ThreadPage() {
                 </button>
               )}
               <p style={{ color: 'var(--text)', lineHeight: 1.7, fontSize: '14px', marginBottom: '12px', whiteSpace: 'pre-wrap' }}>{reply.body}</p>
-              <div style={{ fontSize: '12px', color: 'var(--text3)' }}>
-                <span style={{ color: 'var(--accent2)' }}>{reply.author}</span> · {timeAgo(reply.createdAt)}
+              <div style={{ fontSize: '12px', color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Avatar username={reply.author} avatar={reply.authorAvatar} size={18} />
+                <span style={{ color: 'var(--accent2)' }}>{reply.author}</span>
+                <span>· {timeAgo(reply.createdAt)}</span>
               </div>
             </div>
           ))}
@@ -130,9 +130,12 @@ export default function ThreadPage() {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '24px' }}>
         {user ? (
           <>
-            <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>
-              Reply as <span style={{ color: 'var(--accent2)' }}>{user.username}</span>
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <Avatar username={user.username} size={28} linkToProfile={false} />
+              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600 }}>
+                Reply as <span style={{ color: 'var(--accent2)' }}>{user.username}</span>
+              </h3>
+            </div>
             <form onSubmit={handleReply}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '100px', lineHeight: 1.7 }} placeholder="write your reply..." value={replyBody} onChange={e => setReplyBody(e.target.value)}

@@ -11,6 +11,8 @@ export async function initDb() {
     CREATE TABLE IF NOT EXISTS accounts (
       username TEXT PRIMARY KEY,
       password TEXT NOT NULL,
+      avatar TEXT DEFAULT '',
+      bio TEXT DEFAULT '',
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
@@ -33,4 +35,6 @@ export async function initDb() {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS avatar TEXT DEFAULT ''`
+  await sql`ALTER TABLE accounts ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT ''`
 }

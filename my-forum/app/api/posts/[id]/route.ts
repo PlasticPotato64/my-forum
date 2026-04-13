@@ -11,6 +11,7 @@ export async function DELETE(
     await sql`DELETE FROM posts WHERE id = ${id}`
     return NextResponse.json({ ok: true })
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -28,6 +29,7 @@ export async function POST(
     await sql`INSERT INTO replies (id, post_id, body, author) VALUES (${replyId}, ${id}, ${body}, ${author})`
     return NextResponse.json({ id: replyId })
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

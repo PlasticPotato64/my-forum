@@ -11,6 +11,7 @@ export async function DELETE(
     await sql`DELETE FROM replies WHERE id = ${replyId}`
     return NextResponse.json({ ok: true })
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

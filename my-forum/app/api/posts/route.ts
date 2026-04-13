@@ -7,12 +7,17 @@ export async function GET() {
     const sql = getDb()
     const posts = await sql`SELECT * FROM posts ORDER BY created_at DESC`
     const replies = await sql`SELECT * FROM replies ORDER BY created_at ASC`
+    const accounts = await sql`SELECT username, avatar FROM accounts`
+
+    const avatarMap: Record<string, string> = {}
+    accounts.forEach((a: any) => { avatarMap[a.username] = a.avatar || '' })
 
     const result = posts.map((p: any) => ({
       id: p.id,
       title: p.title,
       body: p.body,
       author: p.author,
+      authorAvatar: avatarMap[p.author] || '',
       category: p.category,
       createdAt: p.created_at,
       replies: replies
@@ -21,12 +26,14 @@ export async function GET() {
           id: r.id,
           body: r.body,
           author: r.author,
+          authorAvatar: avatarMap[r.author] || '',
           createdAt: r.created_at,
         }))
     }))
 
     return NextResponse.json(result)
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -43,6 +50,7 @@ export async function POST(req: NextRequest) {
     await sql`INSERT INTO posts (id, title, body, author, category) VALUES (${id}, ${title}, ${body}, ${author}, ${category})`
     return NextResponse.json({ id })
   } catch (e) {
+    console.error(e)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
