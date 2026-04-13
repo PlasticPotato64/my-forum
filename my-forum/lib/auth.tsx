@@ -1,22 +1,19 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
 
-export type User = {
-  username: string
-  createdAt: string
-}
+export type User = { username: string }
 
 type AuthCtx = {
   user: User | null
-  login: (username: string, password: string) => string | null
-  register: (username: string, password: string) => string | null
+  login: (username: string, password: string) => Promise<string | null>
+  register: (username: string, password: string) => Promise<string | null>
   logout: () => void
 }
 
 const AuthContext = createContext<AuthCtx>({
   user: null,
-  login: () => null,
-  register: () => null,
+  login: async () => null,
+  register: async () => null,
   logout: () => {},
 })
 
@@ -24,45 +21,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('nexus_session')
+    const stored = localStorage.getItem('nexus_user')
     if (stored) setUser(JSON.parse(stored))
   }, [])
 
-  function getAccounts(): Record<string, { password: string; createdAt: string }> {
-    const stored = localStorage.getItem('nexus_accounts')
-    return stored ? JSON.parse(stored) : {}
-  }
-
-  function register(username: string, password: string): string | null {
-    if (!username.trim() || !password.trim()) return 'Fill in all fields'
-    if (username.length < 3) return 'Username must be at least 3 characters'
-    if (password.length < 4) return 'Password must be at least 4 characters'
-    if (!/^[a-zA-Z0-9_]+$/.test(username)) return 'Username can only contain letters, numbers and _'
-    const accounts = getAccounts()
-    if (accounts[username.toLowerCase()]) return 'Username already taken'
-    accounts[username.toLowerCase()] = { password, createdAt: new Date().toISOString() }
-    localStorage.setItem('nexus_accounts', JSON.stringify(accounts))
-    const newUser = { username, createdAt: new Date().toISOString() }
-    setUser(newUser)
-    localStorage.setItem('nexus_session', JSON.stringify(newUser))
+  async function register(username: string, password: string): Promise<string | null> {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'register', username, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) return data.error
+    const u = { username: data.username }
+    setUser(u)
+    localStorage.setItem('nexus_user', JSON.stringify(u))
     return null
   }
 
-  function login(username: string, password: string): string | null {
-    if (!username.trim() || !password.trim()) return 'Fill in all fields'
-    const accounts = getAccounts()
-    const account = accounts[username.toLowerCase()]
-    if (!account) return 'Account not found'
-    if (account.password !== password) return 'Wrong password'
-    const loggedIn = { username, createdAt: account.createdAt }
-    setUser(loggedIn)
-    localStorage.setItem('nexus_session', JSON.stringify(loggedIn))
+  async function login(username: string, password: string): Promise<string | null> {
+    const res = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'login', username, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) return data.error
+    const u = { username: data.username }
+    setUser(u)
+    localStorage.setItem('nexus_user', JSON.stringify(u))
     return null
   }
 
   function logout() {
     setUser(null)
-    localStorage.removeItem('nexus_session')
+    localStorage.removeItem('nexus_user')
   }
 
   return (
