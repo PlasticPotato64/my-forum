@@ -1,3 +1,4 @@
+'use client' 
 import Link from 'next/link'
 import { posts, CATEGORY_COLORS, timeAgo } from '@/lib/posts'
 
