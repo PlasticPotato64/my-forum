@@ -15,69 +15,48 @@ export type Reply = {
   createdAt: string
 }
 
-export const CATEGORIES = ['general', 'tech', 'help', 'showcase', 'off-topic']
-
-export const CATEGORY_COLORS: Record<string, string> = {
-  general: '#7c6af7',
-  tech: '#4ade80',
-  help: '#fbbf24',
-  showcase: '#f472b6',
-  'off-topic': '#60a5fa',
+export function getPosts(): Post[] {
+  if (typeof window === 'undefined') return []
+  const stored = localStorage.getItem('nexus_posts')
+  if (stored) return JSON.parse(stored)
+  const seed: Post[] = [
+    {
+      id: '1',
+      title: 'Welcome to Nexus!',
+      body: 'This is your new community. Create an account and start posting. You can create your own categories when making a post!',
+      author: 'admin',
+      category: 'general',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
+      replies: [
+        { id: 'r1', body: 'Looks sick!', author: 'alice', createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString() }
+      ]
+    },
+    {
+      id: '2',
+      title: 'What are you building?',
+      body: 'Share your current projects with the community.',
+      author: 'devguy',
+      category: 'showcase',
+      createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
+      replies: []
+    },
+  ]
+  localStorage.setItem('nexus_posts', JSON.stringify(seed))
+  return seed
 }
 
-// Seed data so the forum isn't empty
-export const posts: Post[] = [
-  {
-    id: '1',
-    title: 'Welcome to The Forum!',
-    body: 'This is our new dark mode community. Feel free to post about anything — tech, projects, questions, or just chat. Glad to have you here.',
-    author: 'admin',
-    category: 'general',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    replies: [
-      {
-        id: 'r1',
-        body: 'Looks great! Love the dark theme.',
-        author: 'alice',
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-      }
-    ]
-  },
-  {
-    id: '2',
-    title: 'What are you building right now?',
-    body: "Share what projects you're working on. I'm currently building a CLI tool in Rust for managing dotfiles across machines.",
-    author: 'devguy',
-    category: 'tech',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-    replies: []
-  },
-  {
-    id: '3',
-    title: 'Best resources for learning TypeScript?',
-    body: "I've been using JavaScript for a few years and want to make the jump to TypeScript. Any recommended books, courses, or docs?",
-    author: 'newbie99',
-    category: 'help',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    replies: [
-      {
-        id: 'r2',
-        body: 'The official TypeScript handbook is actually really good. Also Matt Pocock on YouTube.',
-        author: 'tsexpert',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
-      },
-      {
-        id: 'r3',
-        body: 'Total TypeScript by Matt Pocock is worth every penny if you want to go deep.',
-        author: 'alice',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-      }
-    ]
-  },
-]
+export function savePosts(posts: Post[]) {
+  localStorage.setItem('nexus_posts', JSON.stringify(posts))
+}
 
-export function getPost(id: string) {
-  return posts.find(p => p.id === id)
+export function getPost(id: string): Post | undefined {
+  return getPosts().find(p => p.id === id)
+}
+
+export function getCategories(): string[] {
+  const posts = getPosts()
+  const cats = Array.from(new Set(posts.map(p => p.category).filter(Boolean)))
+  return cats.length > 0 ? cats : ['general']
 }
 
 export function timeAgo(dateStr: string) {
@@ -89,4 +68,15 @@ export function timeAgo(dateStr: string) {
   if (hrs < 24) return `${hrs}h ago`
   const days = Math.floor(hrs / 24)
   return `${days}d ago`
+}
+
+export function categoryColor(cat: string): string {
+  const colors = [
+    '#7c6af7', '#4ade80', '#fbbf24', '#f472b6',
+    '#60a5fa', '#f87171', '#34d399', '#a78bfa',
+    '#fb923c', '#38bdf8',
+  ]
+  let hash = 0
+  for (let i = 0; i < cat.length; i++) hash = cat.charCodeAt(i) + ((hash << 5) - hash)
+  return colors[Math.abs(hash) % colors.length]
 }

@@ -1,11 +1,17 @@
-'use client' 
+'use client'
 import Link from 'next/link'
-import { posts, CATEGORY_COLORS, timeAgo } from '@/lib/posts'
+import { useEffect, useState } from 'react'
+import { getPosts, categoryColor, timeAgo, type Post } from '@/lib/posts'
 
 export default function Home() {
+  const [posts, setPosts] = useState<Post[]>([])
+
+  useEffect(() => {
+    setPosts(getPosts())
+  }, [])
+
   return (
     <div>
-      {/* Hero */}
       <div style={{
         padding: '48px 0 36px',
         borderBottom: '1px solid var(--border)',
@@ -17,7 +23,6 @@ export default function Home() {
           fontWeight: 800,
           lineHeight: 1.1,
           letterSpacing: '-1px',
-          color: 'var(--text)',
           marginBottom: '12px',
         }}>
           Community<br />
@@ -28,43 +33,43 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Thread list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
         {posts.map((post, i) => (
           <Link key={post.id} href={`/forum/${post.id}`}>
-            <div style={{
-              padding: '20px 24px',
-              background: 'var(--bg2)',
-              border: '1px solid var(--border)',
-              borderRadius: '10px',
-              marginBottom: '8px',
-              transition: 'all 0.15s',
-              cursor: 'pointer',
-              animation: `fadeUp 0.3s ease both`,
-              animationDelay: `${i * 0.05}s`,
-            }}
-            onMouseEnter={e => {
-              const el = e.currentTarget as HTMLDivElement
-              el.style.borderColor = 'var(--border2)'
-              el.style.background = 'var(--bg3)'
-              el.style.transform = 'translateY(-1px)'
-            }}
-            onMouseLeave={e => {
-              const el = e.currentTarget as HTMLDivElement
-              el.style.borderColor = 'var(--border)'
-              el.style.background = 'var(--bg2)'
-              el.style.transform = 'translateY(0)'
-            }}>
+            <div
+              style={{
+                padding: '20px 24px',
+                background: 'var(--bg2)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                transition: 'all 0.15s',
+                cursor: 'pointer',
+                animation: `fadeUp 0.3s ease both`,
+                animationDelay: `${i * 0.05}s`,
+              }}
+              onMouseEnter={e => {
+                const el = e.currentTarget as HTMLDivElement
+                el.style.borderColor = 'var(--border2)'
+                el.style.background = 'var(--bg3)'
+                el.style.transform = 'translateY(-1px)'
+              }}
+              onMouseLeave={e => {
+                const el = e.currentTarget as HTMLDivElement
+                el.style.borderColor = 'var(--border)'
+                el.style.background = 'var(--bg2)'
+                el.style.transform = 'translateY(0)'
+              }}
+            >
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ marginBottom: '8px' }}>
                     <span style={{
                       fontSize: '11px',
                       padding: '2px 8px',
                       borderRadius: '4px',
-                      background: `${CATEGORY_COLORS[post.category]}20`,
-                      color: CATEGORY_COLORS[post.category],
-                      border: `1px solid ${CATEGORY_COLORS[post.category]}40`,
+                      background: `${categoryColor(post.category)}20`,
+                      color: categoryColor(post.category),
+                      border: `1px solid ${categoryColor(post.category)}40`,
                       fontWeight: 500,
                     }}>
                       {post.category}
