@@ -31,13 +31,13 @@ export default function ThreadPage() {
   const router = useRouter()
   const [post, setPost] = useState<Post | null>(null)
   const [replyBody, setReplyBody] = useState('')
+  const [replyError, setReplyError] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
   async function loadPost() {
     const res = await fetch('/api/posts')
     const posts: Post[] = await res.json()
-    const found = posts.find(p => p.id === params.id)
-    setPost(found || null)
+    setPost(posts.find(p => p.id === params.id) || null)
   }
 
   useEffect(() => { loadPost() }, [params.id])
@@ -45,11 +45,14 @@ export default function ThreadPage() {
   async function handleReply(e: React.FormEvent) {
     e.preventDefault()
     if (!replyBody.trim() || !user || !post) return
-    await fetch(`/api/posts/${post.id}`, {
+    setReplyError('')
+    const res = await fetch(`/api/posts/${post.id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body: replyBody.trim(), author: user.username }),
     })
+    const data = await res.json()
+    if (!res.ok) { setReplyError(data.error); return }
     setReplyBody('')
     setSubmitted(true)
     setTimeout(() => setSubmitted(false), 2000)
@@ -57,7 +60,7 @@ export default function ThreadPage() {
   }
 
   async function deletePost() {
-    if (!post) return
+    if (!post || !confirm('Delete this post?')) return
     await fetch(`/api/posts/${post.id}`, { method: 'DELETE' })
     router.push('/')
   }
@@ -68,19 +71,26 @@ export default function ThreadPage() {
     loadPost()
   }
 
+  async function clearAllReplies() {
+    if (!post || !confirm(`Delete all ${post.replies.length} replies?`)) return
+    await fetch(`/api/posts/${post.id}/replies`, { method: 'DELETE' })
+    loadPost()
+  }
+
   if (!post) return <div style={{ paddingTop: '80px', textAlign: 'center', color: 'var(--text3)' }}>loading...</div>
 
   const inputStyle = { width: '100%', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '8px', padding: '12px 16px', color: 'var(--text)', fontSize: '14px', transition: 'border-color 0.15s' }
+  const isAdmin = user?.username === 'admin'
 
   return (
     <div style={{ paddingTop: '32px' }}>
-      <Link href="/" style={{ color: 'var(--text3)', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '28px' }}
+      <Link href="/" style={{ color: 'var(--text3)', fontSize: '13px', display: 'inline-flex', gap: '6px', marginBottom: '28px' }}
         onMouseEnter={e => (e.currentTarget.style.color='var(--text2)')} onMouseLeave={e => (e.currentTarget.style.color='var(--text3)')}>
         ← all threads
       </Link>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '28px', marginBottom: '24px', position: 'relative' }}>
-        {user?.username === 'admin' && (
+        {isAdmin && (
           <button onClick={deletePost} style={{ position: 'absolute', top: '16px', right: '16px', background: 'var(--red)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
             delete post
           </button>
@@ -100,9 +110,16 @@ export default function ThreadPage() {
       </div>
 
       <div style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600, color: 'var(--text2)', marginBottom: '16px' }}>
-          {post.replies.length} {post.replies.length === 1 ? 'reply' : 'replies'}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600, color: 'var(--text2)' }}>
+            {post.replies.length} {post.replies.length === 1 ? 'reply' : 'replies'}
+          </h2>
+          {isAdmin && post.replies.length > 0 && (
+            <button onClick={clearAllReplies} style={{ background: 'var(--red)', color: 'white', border: 'none', borderRadius: '4px', padding: '4px 12px', fontSize: '11px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
+              clear all replies
+            </button>
+          )}
+        </div>
         {post.replies.length === 0 && (
           <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text3)', fontSize: '13px', border: '1px dashed var(--border)', borderRadius: '10px' }}>
             no replies yet — be the first
@@ -111,7 +128,7 @@ export default function ThreadPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {post.replies.map(reply => (
             <div key={reply.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderLeft: '3px solid var(--accent)', borderRadius: '10px', padding: '20px 24px', position: 'relative' }}>
-              {user?.username === 'admin' && (
+              {isAdmin && (
                 <button onClick={() => deleteReply(reply.id)} style={{ position: 'absolute', top: '10px', right: '10px', background: 'var(--red)', color: 'white', border: 'none', borderRadius: '4px', padding: '2px 7px', fontSize: '10px', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
                   delete
                 </button>
@@ -138,8 +155,20 @@ export default function ThreadPage() {
             </div>
             <form onSubmit={handleReply}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '100px', lineHeight: 1.7 }} placeholder="write your reply..." value={replyBody} onChange={e => setReplyBody(e.target.value)}
-                  onFocus={e => e.target.style.borderColor='var(--accent)'} onBlur={e => e.target.style.borderColor='var(--border)'} required />
+                <div style={{ position: 'relative' }}>
+                  <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: '100px', lineHeight: 1.7 }}
+                    placeholder="write your reply... (max 500 chars)"
+                    value={replyBody}
+                    onChange={e => { setReplyBody(e.target.value); setReplyError('') }}
+                    onFocus={e => e.target.style.borderColor='var(--accent)'}
+                    onBlur={e => e.target.style.borderColor='var(--border)'}
+                    maxLength={500}
+                    required />
+                  <span style={{ position: 'absolute', bottom: '8px', right: '12px', fontSize: '11px', color: replyBody.length > 450 ? 'var(--amber)' : 'var(--text3)' }}>
+                    {replyBody.length}/500
+                  </span>
+                </div>
+                {replyError && <p style={{ color: 'var(--red)', fontSize: '13px' }}>{replyError}</p>}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <button type="submit" style={{ padding: '10px 22px', background: 'var(--accent)', color: 'white', borderRadius: '8px', fontSize: '13px', fontFamily: 'var(--font-mono)', border: 'none', cursor: 'pointer' }}>post reply →</button>
                   {submitted && <span style={{ color: 'var(--green)', fontSize: '13px' }}>✓ reply posted!</span>}
