@@ -1,30 +1,14 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import Avatar from '@/components/Avatar'
-import { useRef } from 'react'
+import PointsBadge from '@/components/PointsBadge'
+import { categoryColor, timeAgo, formatPoints } from '@/lib/utils'
 
 type Post = { id: string; title: string; body: string; category: string; createdAt: string; replies: any[] }
-type Profile = { username: string; avatar: string; bio: string; createdAt: string; posts: Post[] }
-
-function categoryColor(cat: string) {
-  const colors = ['#7c6af7','#4ade80','#fbbf24','#f472b6','#60a5fa','#f87171','#34d399','#a78bfa','#fb923c','#38bdf8']
-  let hash = 0
-  for (let i = 0; i < cat.length; i++) hash = cat.charCodeAt(i) + ((hash << 5) - hash)
-  return colors[Math.abs(hash) % colors.length]
-}
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
-}
+type Profile = { username: string; avatar: string; bio: string; createdAt: string; posts: Post[]; equippedTitle: { name: string; color: string } | null }
 
 export default function ProfilePage() {
   const params = useParams()
@@ -36,43 +20,28 @@ export default function ProfilePage() {
   const [bio, setBio] = useState('')
   const [saving, setSaving] = useState(false)
   const [friendStatus, setFriendStatus] = useState<'none'|'pending'|'friends'|'incoming'>('none')
-  const [points, setPoints] = useState(0)
-  const [canClaim, setCanClaim] = useState(false)
-  const [nextClaim, setNextClaim] = useState<string|null>(null)
-  const [claimMsg, setClaimMsg] = useState('')
-  const [tradeAmount, setTradeAmount] = useState('')
+  const [tradeAmount, setTradeAmount] = useState('10')
   const [tradeMsg, setTradeMsg] = useState('')
-  const [myPoints, setMyPoints] = useState(0)
 
   const isOwn = user?.username === params.username
 
-  async function loadProfile() {
+  async function loadAll() {
     const res = await fetch(`/api/profile?username=${params.username}`)
     if (res.ok) { const d = await res.json(); setProfile(d); setBio(d.bio || '') }
     setLoading(false)
-  }
-
-  async function loadPoints() {
-    const res = await fetch(`/api/points?username=${params.username}`)
-    if (res.ok) { const d = await res.json(); setPoints(d.points); setCanClaim(d.canClaim); setNextClaim(d.nextClaim) }
     if (user && !isOwn) {
-      const res2 = await fetch(`/api/points?username=${user.username}`)
-      if (res2.ok) { const d = await res2.json(); setMyPoints(d.points) }
+      const fr = await fetch(`/api/friends?username=${user.username}`)
+      if (fr.ok) {
+        const d = await fr.json()
+        if (d.friends.includes(params.username)) setFriendStatus('friends')
+        else if (d.sent?.some((r: any) => r.to_user === params.username)) setFriendStatus('pending')
+        else if (d.incoming?.some((r: any) => r.from_user === params.username)) setFriendStatus('incoming')
+        else setFriendStatus('none')
+      }
     }
   }
 
-  async function loadFriendStatus() {
-    if (!user || isOwn) return
-    const res = await fetch(`/api/friends?username=${user.username}`)
-    if (!res.ok) return
-    const data = await res.json()
-    if (data.friends.includes(params.username)) { setFriendStatus('friends'); return }
-    if (data.sent.some((r: any) => r.to_user === params.username)) { setFriendStatus('pending'); return }
-    if (data.incoming.some((r: any) => r.from_user === params.username)) { setFriendStatus('incoming'); return }
-    setFriendStatus('none')
-  }
-
-  useEffect(() => { loadProfile(); loadPoints(); loadFriendStatus() }, [params.username, user])
+  useEffect(() => { loadAll() }, [params.username, user])
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -81,7 +50,7 @@ export default function ProfilePage() {
     const reader = new FileReader()
     reader.onload = async () => {
       await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: profile.username, avatar: reader.result, bio: profile.bio }) })
-      loadProfile()
+      loadAll()
     }
     reader.readAsDataURL(file)
   }
@@ -90,7 +59,7 @@ export default function ProfilePage() {
     if (!profile) return
     setSaving(true)
     await fetch('/api/profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: profile.username, avatar: profile.avatar, bio }) })
-    setSaving(false); setEditing(false); loadProfile()
+    setSaving(false); setEditing(false); loadAll()
   }
 
   async function sendFriendRequest() {
@@ -101,22 +70,15 @@ export default function ProfilePage() {
     else alert(data.error)
   }
 
-  async function claimPoints() {
-    if (!user) return
-    const res = await fetch('/api/points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'claim', username: user.username }) })
-    const data = await res.json()
-    if (res.ok) { setClaimMsg('+10 points claimed!'); loadPoints(); setTimeout(() => setClaimMsg(''), 3000) }
-    else setClaimMsg(data.error)
-  }
-
   async function tradePoints() {
-    if (!user || !tradeAmount) return
+    if (!user) return
     const amt = parseInt(tradeAmount)
-    if (isNaN(amt) || amt < 1) { setTradeMsg('Enter a valid amount'); return }
+    if (isNaN(amt) || amt < 10) { setTradeMsg('Minimum 10 Points'); return }
     const res = await fetch('/api/points', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'trade', username: user.username, toUser: params.username, amount: amt }) })
     const data = await res.json()
-    if (res.ok) { setTradeMsg(`Sent ${amt} points!`); setTradeAmount(''); loadPoints(); setTimeout(() => setTradeMsg(''), 3000) }
+    if (res.ok) { setTradeMsg(`Sent ${formatPoints(amt)} Points!`); setTradeAmount('10'); loadAll() }
     else setTradeMsg(data.error)
+    setTimeout(() => setTradeMsg(''), 3000)
   }
 
   if (loading) return <div style={{ paddingTop: '80px', textAlign: 'center', color: 'var(--text3)' }}>loading...</div>
@@ -124,8 +86,8 @@ export default function ProfilePage() {
 
   return (
     <div style={{ paddingTop: '40px' }}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '32px', marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '20px', flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '16px', padding: '28px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative' }}>
             <Avatar username={profile.username} avatar={profile.avatar} size={80} linkToProfile={false} />
             {isOwn && <>
@@ -134,10 +96,17 @@ export default function ProfilePage() {
             </>}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '4px' }}>
-              <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>{profile.username}</h1>
-              {profile.username === 'admin' && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#7c6af720', color: '#7c6af7', border: '1px solid #7c6af740' }}>admin</span>}
-              <span style={{ fontSize: '13px', color: 'var(--amber)', fontWeight: 500 }}>⭐ {points} pts</span>
+            {/* Username + title + points badge on right */}
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                {profile.equippedTitle && (
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: `${profile.equippedTitle.color}20`, color: profile.equippedTitle.color, border: `1px solid ${profile.equippedTitle.color}40`, fontFamily: 'var(--font-mono)' }}>
+                    {profile.equippedTitle.name}
+                  </span>
+                )}
+                <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: 800, letterSpacing: '-0.5px' }}>{profile.username}</h1>
+                {profile.username === 'admin' && <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', background: '#7c6af720', color: '#7c6af7', border: '1px solid #7c6af740' }}>admin</span>}
+              </div>
             </div>
             <p style={{ color: 'var(--text3)', fontSize: '12px', marginBottom: '10px' }}>joined {timeAgo(profile.createdAt)} · {profile.posts.length} posts</p>
 
@@ -150,42 +119,35 @@ export default function ProfilePage() {
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
                 <p style={{ color: profile.bio ? 'var(--text)' : 'var(--text3)', fontSize: '14px' }}>{profile.bio || (isOwn ? 'No bio — click edit' : 'No bio yet.')}</p>
                 {isOwn && <button onClick={() => setEditing(true)} style={{ padding: '3px 10px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', cursor: 'pointer', flexShrink: 0 }}>edit</button>}
               </div>
             )}
 
             {/* Action buttons */}
-            <div style={{ marginTop: '14px', display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
               {isOwn && (
                 <>
-                  <button onClick={claimPoints} disabled={!canClaim} style={{ padding: '7px 16px', background: canClaim ? 'var(--amber)' : 'var(--bg3)', color: canClaim ? 'var(--bg)' : 'var(--text3)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: canClaim ? 'pointer' : 'not-allowed', fontWeight: 600 }}>
-                    {canClaim ? '⭐ claim 10 pts' : `⭐ claim in ${nextClaim ? Math.max(0, Math.ceil((new Date(nextClaim).getTime() - Date.now()) / 3600000)) + 'h' : '24h'}`}
-                  </button>
-                  {claimMsg && <span style={{ color: 'var(--green)', fontSize: '12px' }}>{claimMsg}</span>}
-                  <Link href="/inbox" style={{ padding: '7px 16px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: '6px', fontSize: '12px' }}>📬 inbox</Link>
+                  <Link href="/rewards" style={{ padding: '7px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: '6px', fontSize: '12px' }}>⭐ Daily Rewards</Link>
+                  <Link href="/games/rng" style={{ padding: '7px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: '6px', fontSize: '12px' }}>🎲 Title RNG</Link>
                 </>
               )}
               {!isOwn && user && (
                 <>
-                  {friendStatus === 'none' && <button onClick={sendFriendRequest} style={{ padding: '7px 16px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>+ add friend</button>}
-                  {friendStatus === 'pending' && <span style={{ padding: '7px 16px', background: 'var(--bg3)', color: 'var(--text3)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px' }}>request sent</span>}
-                  {friendStatus === 'friends' && <span style={{ padding: '7px 16px', background: 'var(--bg3)', color: 'var(--green)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px' }}>✓ friends</span>}
-                  {friendStatus === 'incoming' && <Link href="/inbox" style={{ padding: '7px 16px', background: 'var(--green)', color: 'white', borderRadius: '6px', fontSize: '12px' }}>accept request →</Link>}
+                  {friendStatus === 'none' && <button onClick={sendFriendRequest} style={{ padding: '7px 14px', background: 'var(--accent)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>+ Add Friend</button>}
+                  {friendStatus === 'pending' && <span style={{ padding: '7px 14px', background: 'var(--bg3)', color: 'var(--text3)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px' }}>Request sent</span>}
+                  {friendStatus === 'friends' && <span style={{ padding: '7px 14px', background: 'var(--bg3)', color: 'var(--green)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px' }}>✓ Friends</span>}
+                  {friendStatus === 'incoming' && <Link href="/inbox" style={{ padding: '7px 14px', background: 'var(--green)', color: 'white', borderRadius: '6px', fontSize: '12px' }}>Accept request →</Link>}
+                  {/* Send points */}
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    <input type="number" value={tradeAmount} onChange={e => setTradeAmount(e.target.value)} min="10" style={{ width: '72px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 10px', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
+                    <button onClick={tradePoints} style={{ padding: '7px 14px', background: '#ffb3b3', color: '#c0392b', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer', fontWeight: 600 }}>Send Points</button>
+                  </div>
+                  {tradeMsg && <span style={{ fontSize: '12px', color: tradeMsg.includes('Sent') ? 'var(--green)' : 'var(--red)' }}>{tradeMsg}</span>}
                 </>
               )}
             </div>
-
-            {/* Trade points */}
-            {!isOwn && user && friendStatus === 'friends' && (
-              <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '12px', color: 'var(--text3)' }}>send points (you have {myPoints}):</span>
-                <input type="number" value={tradeAmount} onChange={e => setTradeAmount(e.target.value)} placeholder="amount" min="1" style={{ width: '80px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '6px', padding: '5px 10px', color: 'var(--text)', fontSize: '12px', fontFamily: 'var(--font-mono)' }} />
-                <button onClick={tradePoints} style={{ padding: '5px 14px', background: 'var(--amber)', color: 'var(--bg)', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer', fontWeight: 600 }}>send ⭐</button>
-                {tradeMsg && <span style={{ fontSize: '12px', color: tradeMsg.includes('Sent') ? 'var(--green)' : 'var(--red)' }}>{tradeMsg}</span>}
-              </div>
-            )}
           </div>
         </div>
       </div>

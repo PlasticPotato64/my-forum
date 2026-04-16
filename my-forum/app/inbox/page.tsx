@@ -5,23 +5,20 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Avatar from '@/components/Avatar'
 
-type Request = { id: string; from_user: string; to_user: string; created_at: string }
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ago`
-  return `${Math.floor(hrs / 24)}d ago`
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime()
+  const m = Math.floor(diff/60000)
+  if (m < 1) return 'just now'
+  if (m < 60) return `${m}m ago`
+  const h = Math.floor(m/60)
+  if (h < 24) return `${h}h ago`
+  return `${Math.floor(h/24)}d ago`
 }
 
 export default function InboxPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const [incoming, setIncoming] = useState<Request[]>([])
-  const [friends, setFriends] = useState<string[]>([])
+  const [incoming, setIncoming] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,91 +29,43 @@ export default function InboxPage() {
   async function load() {
     if (!user) return
     const res = await fetch(`/api/friends?username=${user.username}`)
-    const data = await res.json()
-    setIncoming(data.incoming || [])
-    setFriends(data.friends || [])
+    if (res.ok) { const d = await res.json(); setIncoming(d.incoming || []) }
     setLoading(false)
   }
 
   async function respond(requestId: string, action: 'accept' | 'decline') {
-    await fetch('/api/friends', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action, requestId }),
-    })
-    load()
-  }
-
-  async function removeFriend(friendName: string) {
-    if (!user) return
-    await fetch('/api/friends', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'remove', from: user.username, to: friendName }),
-    })
+    await fetch('/api/friends', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, requestId }) })
     load()
   }
 
   if (!user) return null
 
   return (
-    <div style={{ paddingTop: '40px', maxWidth: '600px' }}>
-      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: '32px' }}>
-        Inbox
-      </h1>
+    <div style={{ paddingTop: '40px', maxWidth: '520px' }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '28px', fontWeight: 800, letterSpacing: '-0.5px', marginBottom: '8px' }}>Inbox</h1>
+      <p style={{ color: 'var(--text2)', fontSize: '13px', marginBottom: '28px' }}>Pending friend requests</p>
 
-      {/* Friend requests */}
-      <div style={{ marginBottom: '40px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600, color: 'var(--text2)', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          Friend Requests
-          {incoming.length > 0 && <span style={{ background: 'var(--accent)', color: 'white', borderRadius: '10px', padding: '1px 8px', fontSize: '11px' }}>{incoming.length}</span>}
-        </h2>
-        {incoming.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text3)', border: '1px dashed var(--border)', borderRadius: '10px', fontSize: '13px' }}>
-            No pending requests
-          </div>
-        ) : incoming.map(req => (
-          <div key={req.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '16px 20px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Avatar username={req.from_user} size={36} />
-              <div>
-                <Link href={`/profile/${req.from_user}`} style={{ color: 'var(--text)', fontSize: '14px', fontWeight: 500 }}>{req.from_user}</Link>
-                <p style={{ color: 'var(--text3)', fontSize: '11px' }}>{timeAgo(req.created_at)}</p>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => respond(req.id, 'accept')} style={{ padding: '6px 14px', background: 'var(--green)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
-                accept
-              </button>
-              <button onClick={() => respond(req.id, 'decline')} style={{ padding: '6px 14px', background: 'var(--bg3)', color: 'var(--text2)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
-                decline
-              </button>
+      {loading ? (
+        <p style={{ color: 'var(--text3)' }}>loading...</p>
+      ) : incoming.length === 0 ? (
+        <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text3)', border: '1px dashed var(--border)', borderRadius: '12px', fontSize: '13px' }}>
+          No pending friend requests
+        </div>
+      ) : incoming.map(req => (
+        <div key={req.id} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <Avatar username={req.from_user} size={38} />
+            <div>
+              <Link href={`/profile/${req.from_user}`} style={{ fontSize: '14px', fontWeight: 500, color: 'var(--text)' }}>{req.from_user}</Link>
+              <p style={{ color: 'var(--text3)', fontSize: '11px', marginTop: '2px' }}>sent {timeAgo(req.created_at)}</p>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Friends list */}
-      <div>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '16px', fontWeight: 600, color: 'var(--text2)', marginBottom: '16px' }}>
-          Friends · {friends.length}
-        </h2>
-        {friends.length === 0 ? (
-          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text3)', border: '1px dashed var(--border)', borderRadius: '10px', fontSize: '13px' }}>
-            No friends yet — visit someone's profile to add them!
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button onClick={() => respond(req.id, 'accept')} style={{ padding: '7px 16px', background: 'transparent', border: '1px solid var(--green)', color: 'var(--green)', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer', fontWeight: 600 }}>Accept</button>
+            <button onClick={() => respond(req.id, 'decline')} style={{ padding: '7px 16px', background: 'transparent', border: '1px solid var(--border)', color: 'var(--text2)', borderRadius: '6px', fontSize: '12px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>Decline</button>
           </div>
-        ) : friends.map(name => (
-          <div key={name} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '14px 18px', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Link href={`/profile/${name}`} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Avatar username={name} size={32} />
-              <span style={{ color: 'var(--text)', fontSize: '14px' }}>{name}</span>
-            </Link>
-            <button onClick={() => removeFriend(name)} style={{ padding: '4px 10px', background: 'transparent', color: 'var(--text3)', border: '1px solid var(--border)', borderRadius: '6px', fontSize: '11px', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
-              remove
-            </button>
-          </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   )
 }
