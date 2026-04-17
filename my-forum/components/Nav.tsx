@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
 import { useState, useEffect } from 'react'
 import Avatar from './Avatar'
+import { formatPoints } from '@/lib/utils'
 
 export default function Nav() {
   const { user, logout } = useAuth()
@@ -10,10 +11,11 @@ export default function Nav() {
   const [showGames, setShowGames] = useState(false)
   const [avatar, setAvatar] = useState('')
   const [inboxCount, setInboxCount] = useState(0)
+  const [points, setPoints] = useState(0)
 
   useEffect(() => {
     if (!user) return
-    fetch(`/api/profile?username=${user.username}`).then(r => r.ok ? r.json() : null).then(d => { if (d) setAvatar(d.avatar || '') })
+    fetch(`/api/profile?username=${user.username}`).then(r => r.ok ? r.json() : null).then(d => { if (d) { setAvatar(d.avatar || ''); setPoints(d.points || 0) } })
     fetch(`/api/friends?username=${user.username}`).then(r => r.ok ? r.json() : null).then(d => { if (d) setInboxCount(d.incoming?.length || 0) })
   }, [user])
 
@@ -28,13 +30,12 @@ export default function Nav() {
             Forums
           </Link>
           <div style={{ position: 'relative' }}>
-            <button onClick={() => setShowGames(!showGames)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', color: 'var(--text2)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', transition: 'all 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.background='var(--bg3)')} onMouseLeave={e => (e.currentTarget.style.background=showGames?'var(--bg3)':'transparent')}>
+            <button onClick={() => setShowGames(!showGames)} style={{ padding: '6px 14px', borderRadius: '6px', fontSize: '13px', color: 'var(--text2)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
               Games ▾
             </button>
             {showGames && (
               <div style={{ position: 'absolute', left: 0, top: '44px', background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', minWidth: '160px', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
-                <Link href="/games/rng" onClick={() => setShowGames(false)} style={{ display: 'block', padding: '11px 16px', fontSize: '13px', color: 'var(--text2)', transition: 'background 0.1s' }}
+                <Link href="/games/rng" onClick={() => setShowGames(false)} style={{ display: 'block', padding: '11px 16px', fontSize: '13px', color: 'var(--text2)' }}
                   onMouseEnter={e => (e.currentTarget.style.background='var(--bg3)')} onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
                   🎲 Title RNG
                 </Link>
@@ -42,19 +43,23 @@ export default function Nav() {
             )}
           </div>
         </div>
+
         {/* Right */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {user ? (
             <>
               <Link href="/forum/new" style={{ padding: '6px 16px', borderRadius: '6px', background: 'var(--accent)', color: 'white', fontSize: '13px', fontWeight: 500 }}>+ new post</Link>
-              {/* Inbox button */}
               <Link href="/inbox" style={{ position: 'relative', padding: '6px 10px', borderRadius: '6px', background: 'var(--bg3)', border: '1px solid var(--border)', color: 'var(--text2)', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 📬
                 {inboxCount > 0 && <span style={{ background: 'var(--red)', color: 'white', borderRadius: '50%', width: '16px', height: '16px', fontSize: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{inboxCount}</span>}
               </Link>
-              {/* Avatar dropdown */}
+              {/* Points badge next to avatar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: '20px', padding: '3px 10px 3px 3px', direction: 'rtl' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text)', fontFamily: 'var(--font-mono)', direction: 'ltr', whiteSpace: 'nowrap' }}>{formatPoints(points)}</span>
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#e53e3e', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', flexShrink: 0 }}>⭐</div>
+              </div>
               <div style={{ position: 'relative' }}>
-                <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', position: 'relative', display: 'flex' }}>
+                <button onClick={() => setShowMenu(!showMenu)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', display: 'flex' }}>
                   <Avatar username={user.username} avatar={avatar} size={34} linkToProfile={false} />
                 </button>
                 {showMenu && (
@@ -69,7 +74,7 @@ export default function Nav() {
                       { href: '/rewards', label: 'Daily Rewards' },
                       { href: '/settings', label: 'Settings' },
                     ].map(item => (
-                      <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{ display: 'block', padding: '10px 16px', fontSize: '13px', color: 'var(--text2)', transition: 'background 0.1s' }}
+                      <Link key={item.href} href={item.href} onClick={() => setShowMenu(false)} style={{ display: 'block', padding: '10px 16px', fontSize: '13px', color: 'var(--text2)' }}
                         onMouseEnter={e => (e.currentTarget.style.background='var(--bg3)')} onMouseLeave={e => (e.currentTarget.style.background='transparent')}>
                         {item.label}
                       </Link>

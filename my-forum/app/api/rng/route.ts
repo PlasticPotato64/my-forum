@@ -1,22 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getDb, initDb } from '@/lib/db'
 
+// Odds = 1 in X. Lower = more common. Noob removed as base.
 const TITLES = [
-  { id: 't1', name: 'Noob', rarity: 'Common', odds: 2, color: '#9ca3af', price: 5 },
-  { id: 't2', name: 'Adventurer', rarity: 'Uncommon', odds: 10, color: '#4ade80', price: 15 },
-  { id: 't3', name: 'Veteran', rarity: 'Rare', odds: 50, color: '#60a5fa', price: 50 },
-  { id: 't4', name: 'Elite', rarity: 'Epic', odds: 500, color: '#a78bfa', price: 200 },
-  { id: 't5', name: 'Legend', rarity: 'Legendary', odds: 5000, color: '#fbbf24', price: 1000 },
-  { id: 't6', name: 'Mythic', rarity: 'Mythic', odds: 50000, color: '#f472b6', price: 5000 },
-  { id: 't7', name: 'Celestial', rarity: 'Celestial', odds: 500000, color: '#38bdf8', price: 25000 },
-  { id: 't8', name: 'Divine', rarity: 'Divine', odds: 5000000, color: '#fb923c', price: 100000 },
-  { id: 't9', name: 'Transcendent', rarity: 'Transcendent', odds: 50000000, color: '#f87171', price: 500000 },
-  { id: 't10', name: 'Eternal', rarity: 'Eternal', odds: 500000000, color: '#7c6af7', price: 2000000 },
-  { id: 't11', name: 'Omnipotent', rarity: 'Omnipotent', odds: 1000000000, color: '#ffffff', price: 10000000 },
+  { id: 't2', name: 'Adventurer', odds: 3, color: '#4ade80', price: 15 },
+  { id: 't3', name: 'Veteran', odds: 10, color: '#60a5fa', price: 50 },
+  { id: 't4', name: 'Elite', odds: 50, color: '#a78bfa', price: 200 },
+  { id: 't5', name: 'Legend', odds: 500, color: '#fbbf24', price: 1000 },
+  { id: 't6', name: 'Mythic', odds: 5000, color: '#f472b6', price: 5000 },
+  { id: 't7', name: 'Celestial', odds: 50000, color: '#38bdf8', price: 25000 },
+  { id: 't8', name: 'Divine', odds: 500000, color: '#fb923c', price: 100000 },
+  { id: 't9', name: 'Transcendent', odds: 5000000, color: '#f87171', price: 500000 },
+  { id: 't10', name: 'Eternal', odds: 50000000, color: '#7c6af7', price: 2000000 },
+  { id: 't11', name: 'Omnipotent', odds: 1000000000, color: '#ffffff', price: 10000000 },
 ]
 
-function roll(luckMult: number): typeof TITLES[0] {
-  const weights = TITLES.map(t => (1 / t.odds) * luckMult)
+function roll(luckAdd: number, luckMult: number): typeof TITLES[0] {
+  // Each title weight = (1/odds) * mult + add bonus split across all
+  const weights = TITLES.map(t => (1 / t.odds) * luckMult + luckAdd / t.odds)
   const total = weights.reduce((a, b) => a + b, 0)
   let rand = Math.random() * total
   for (let i = 0; i < TITLES.length; i++) {
@@ -33,23 +34,22 @@ export async function POST(req: NextRequest) {
     const sql = getDb()
 
     if (action === 'roll') {
-      // Check active potions
       const now = new Date()
       const potions = await sql`SELECT * FROM potions WHERE username = ${username} AND expires_at > ${now.toISOString()}`
       let luckMult = 1
+      let luckAdd = 0
       for (const p of potions) {
         if (p.type === 'luck') luckMult *= 2
-        if (p.type === 'divine') luckMult += 50000
-        if (p.type === 'divine2') luckMult += 120000
+        if (p.type === 'divine') luckAdd += 50000
+        if (p.type === 'divine2') luckAdd += 120000
       }
-      const result = roll(luckMult)
-      // Save title to user
+      const result = roll(luckAdd, luckMult)
       await sql`INSERT INTO user_titles (id, username, title_id) VALUES (${String(Date.now())}, ${username}, ${result.id})`
       return NextResponse.json({ title: result })
     }
 
     if (action === 'inventory') {
-      const inv = await sql`SELECT ut.*, t.name, t.color, t.rarity, t.odds FROM user_titles ut JOIN titles t ON ut.title_id = t.id WHERE ut.username = ${username} ORDER BY ut.acquired_at DESC`
+      const inv = await sql`SELECT ut.*, t.name, t.color, t.odds FROM user_titles ut JOIN titles t ON ut.title_id = t.id WHERE ut.username = ${username} ORDER BY ut.acquired_at DESC`
       const potions = await sql`SELECT * FROM potions WHERE username = ${username} AND expires_at > NOW()`
       return NextResponse.json({ inventory: inv, potions })
     }
@@ -66,9 +66,9 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'sell') {
-      const title = await sql`SELECT ut.*, t.odds FROM user_titles ut JOIN titles t ON ut.title_id = t.id WHERE ut.id = ${titleId} AND ut.username = ${username}`
+      const title = await sql`SELECT ut.*, t.id as tid FROM user_titles ut JOIN titles t ON ut.title_id = t.id WHERE ut.id = ${titleId} AND ut.username = ${username}`
       if (title.length === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-      const t = TITLES.find(x => x.id === title[0].title_id)
+      const t = TITLES.find(x => x.id === title[0].tid)
       if (!t) return NextResponse.json({ error: 'Title not found' }, { status: 404 })
       const sellPrice = Math.floor(t.price * 0.3)
       await sql`DELETE FROM user_titles WHERE id = ${titleId}`
@@ -83,7 +83,6 @@ export async function POST(req: NextRequest) {
       if (!cost) return NextResponse.json({ error: 'Invalid potion' }, { status: 400 })
       const acc = await sql`SELECT points FROM accounts WHERE username = ${username}`
       if (acc.length === 0 || (acc[0].points || 0) < cost) return NextResponse.json({ error: 'Not enough Points' }, { status: 400 })
-      // Check if same type active - extend instead of stack
       const existing = await sql`SELECT * FROM potions WHERE username = ${username} AND type = ${potionType} AND expires_at > NOW() LIMIT 1`
       const mins = durations[potionType]
       if (existing.length > 0) {
