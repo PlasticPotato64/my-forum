@@ -1,11 +1,10 @@
 export function formatPoints(n: number): string {
-  if (n < 1000) return String(n)
+  if (n < 1000) return String(Math.round(n))
   const units = ['K','M','B','T']
   let val = n, unit = ''
   for (const u of units) {
     if (val >= 1000) { val /= 1000; unit = u } else break
   }
-  // 3 s.f., no trailing zeros
   let s = val.toPrecision(3)
   s = String(parseFloat(s))
   return s + unit
